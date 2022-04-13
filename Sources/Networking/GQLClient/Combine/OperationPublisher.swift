@@ -48,7 +48,6 @@ class OperationPublisher<OperationType: GraphQLOperation>: Publisher {
       operationQueue: operationQueue
     )
     subscriber.receive(subscription: subscription)
-    subscription.start()
   }
 
   func createSubscription<SubscriberType>(

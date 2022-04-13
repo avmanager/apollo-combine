@@ -56,15 +56,16 @@ class OperationSubscription<SubscriberType: Subscriber, OperationType: GraphQLOp
   }
 
   final func request(_ demand: Subscribers.Demand) {
-    // Unlimited demand, no adjustments needed.
-  }
+    guard demand > .none else {
+      return
+    }
 
-  final func start() {
     lock.lock()
     defer {
       lock.unlock()
     }
 
+    cancellable?.cancel()
     cancellable = executeOperation()
   }
 
@@ -74,16 +75,12 @@ class OperationSubscription<SubscriberType: Subscriber, OperationType: GraphQLOp
       lock.unlock()
     }
 
-    guard let subscriber = subscriber else {
-      return
-    }
-
     if completion == .onCancel {
-      subscriber.receive(completion: .finished)
+      subscriber?.receive(completion: .finished)
     }
 
     // Release the subscriber reference and also prevent it from further receiving values.
-    self.subscriber = nil
+    subscriber = nil
     cancellable?.cancel()
   }
 
