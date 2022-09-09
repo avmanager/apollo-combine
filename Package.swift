@@ -3,25 +3,26 @@
 import PackageDescription
 
 let package = Package(
-  name: "Networking",
+  name: "ApolloCombine",
   platforms: [
     .iOS(.v13),
     .macOS(.v12),
   ],
   products: [
     .library(
-      name: "Networking",
-      targets: ["Networking"]
+      name: "ApolloCombine",
+      targets: ["ApolloCombine"]
     ),
   ],
   dependencies: [
-    .package(name: "Apollo", url: "https://github.com/apollographql/apollo-ios", .upToNextMajor(from: "0.50.0")),
+    .package(url: "https://github.com/apollographql/apollo-ios", .upToNextMajor(from: "0.51.2")),
   ],
   targets: [
     .target(
-      name: "Networking",
+      name: "ApolloCombine",
       dependencies: [
-        "Apollo",
+        .product(name: "Apollo", package: "apollo-ios"),
+        .product(name: "ApolloWebSocket", package: "apollo-ios"),
       ]
     ),
   ]

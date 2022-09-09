@@ -24,27 +24,26 @@ import Apollo
 import Combine
 import Foundation
 
-class SubscriptionSubscription<SubscriberType: Subscriber, SubscriptionType: GraphQLSubscription>: OperationSubscription<SubscriberType, SubscriptionType>
-  where SubscriberType.Input == SubscriptionType.Data, SubscriberType.Failure == GQLError
-{
-  init(
-    subscriber: SubscriberType,
-    client: ApolloClientProtocol,
-    operation: SubscriptionType,
-    operationQueue: DispatchQueue
-  ) {
-    super.init(
-      subscriber: subscriber,
-      client: client,
-      operation: operation,
-      operationQueue: operationQueue,
-      completion: .onCancel
-    )
-  }
+struct SubscriptionPublisher<SubscriptionType: GraphQLSubscription>: Publisher {
+  typealias Output = SubscriptionType.Data
+  typealias Failure = GQLError
 
-  override func executeOperation() -> Apollo.Cancellable {
-    client.subscribe(subscription: operation, queue: operationQueue) { [weak self] result in
-      self?.handle(result: result)
-    }
+  let client: ApolloClientProtocol
+  let subscription: SubscriptionType
+  let queue: DispatchQueue
+
+  func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+    subscriber.receive(
+      subscription: OperationSubscription(
+        completion: .none,
+        operation: { resultHandler in
+          client.subscribe(
+            subscription: subscription,
+            queue: queue,
+            resultHandler: resultHandler
+          )
+        },
+        subscriber: subscriber
+      ))
   }
 }

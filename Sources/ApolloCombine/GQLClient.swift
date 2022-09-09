@@ -24,34 +24,34 @@ import Apollo
 import Combine
 import Foundation
 
-class QueryPublisher<QueryType: GraphQLQuery>: OperationPublisher<QueryType> {
-  private let cachePolicy: CachePolicy
-
-  init(
-    cachePolicy: CachePolicy,
-    client: ApolloClientProtocol,
+/// A client used to communicate with the backend via GraphQL operations.
+public protocol GQLClient {
+  /// Perform a GQL query operation.
+  ///
+  /// - Parameters:
+  ///   - query: The query operation.
+  ///   - cachePolicy: The cache policy to use for the query's results.
+  ///   - contextIdentifier: An UUID that can be used to identify the query.
+  /// - Returns: A publisher for the query result data and error.
+  func fetch<QueryType: GraphQLQuery>(
     query: QueryType,
-    operationQueue: DispatchQueue
-  ) {
-    self.cachePolicy = cachePolicy
+    cachePolicy: CachePolicy,
+    contextIdentifier: UUID?
+  ) -> AnyPublisher<QueryType.Data, GQLError>
 
-    super.init(client: client, operation: query, operationQueue: operationQueue)
-  }
+  /// Perform a GQL mutation operation.
+  ///
+  /// - Parameters:
+  ///   - mutation: The mutation operation.
+  /// - Returns: A publisher for the mutation result data and error.
+  func perform<MutationType: GraphQLMutation>(mutation: MutationType) -> AnyPublisher<MutationType.Data, GQLError>
 
-  override func createSubscription<SubscriberType>(
-    for subscriber: SubscriberType,
-    client: ApolloClientProtocol,
-    operation: QueryType,
-    operationQueue: DispatchQueue
-  ) -> OperationSubscription<SubscriberType, QueryType>
-    where SubscriberType: Subscriber, QueryType.Data == SubscriberType.Input, SubscriberType.Failure == GQLError
-  {
-    QuerySubscription(
-      cachePolicy: cachePolicy,
-      subscriber: subscriber,
-      client: client,
-      operation: operation,
-      operationQueue: operationQueue
-    )
-  }
+  /// Subscribe to a GQL subscription.
+  ///
+  /// - Parameters:
+  ///   - subscription: The subscription to subscribe to.
+  /// - Returns: A publisher for the subscription result data and error.
+  func subscribe<SubscriptionType: GraphQLSubscription>(
+    subscription: SubscriptionType
+  ) -> AnyPublisher<SubscriptionType.Data, GQLError>
 }

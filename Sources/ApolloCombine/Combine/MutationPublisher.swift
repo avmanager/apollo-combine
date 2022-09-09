@@ -24,38 +24,27 @@ import Apollo
 import Combine
 import Foundation
 
-class OperationPublisher<OperationType: GraphQLOperation>: Publisher {
-  typealias Output = OperationType.Data
+struct MutationPublisher<MutationType: GraphQLMutation>: Publisher {
+  typealias Output = MutationType.Data
   typealias Failure = GQLError
 
-  private let client: ApolloClientProtocol
-  private let operation: OperationType
-  private let operationQueue: DispatchQueue
+  let client: ApolloClientProtocol
+  let mutation: MutationType
+  let queue: DispatchQueue
 
-  init(client: ApolloClientProtocol, operation: OperationType, operationQueue: DispatchQueue) {
-    self.client = client
-    self.operation = operation
-    self.operationQueue = operationQueue
-  }
-
-  final func receive<SubscriberType>(subscriber: SubscriberType)
-    where SubscriberType: Subscriber, GQLError == SubscriberType.Failure, OperationType.Data == SubscriberType.Input
-  {
-    let subscription: OperationSubscription<SubscriberType, OperationType> = createSubscription(
-      for: subscriber,
-      client: client,
-      operation: operation,
-      operationQueue: operationQueue
-    )
-    subscriber.receive(subscription: subscription)
-  }
-
-  func createSubscription<SubscriberType>(
-    for: SubscriberType,
-    client: ApolloClientProtocol,
-    operation: OperationType,
-    operationQueue: DispatchQueue
-  ) -> OperationSubscription<SubscriberType, OperationType> {
-    fatalError("missing implementation")
+  func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+    subscriber.receive(
+      subscription: OperationSubscription(
+        completion: .onSuccess,
+        operation: { resultHandler in
+          client.perform(
+            mutation: mutation,
+            publishResultToStore: true,
+            queue: queue,
+            resultHandler: resultHandler
+          )
+        },
+        subscriber: subscriber
+      ))
   }
 }

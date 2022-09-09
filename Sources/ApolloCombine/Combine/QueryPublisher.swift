@@ -24,32 +24,30 @@ import Apollo
 import Combine
 import Foundation
 
-/// A client used to communicate with the backend via GraphQL operations.
-public protocol GQLClient {
-  /// Perform a GQL query operation.
-  ///
-  /// - Parameters:
-  ///   - query: The query operation.
-  ///   - cachePolicy: The cache policy to use for the query's results.
-  /// - Returns: A publisher for the query result data and error.
-  func fetch<QueryType: GraphQLQuery>(
-    query: QueryType,
-    cachePolicy: CachePolicy
-  ) -> AnyPublisher<QueryType.Data, GQLError>
+struct QueryPublisher<QueryType: GraphQLQuery>: Publisher {
+  typealias Output = QueryType.Data
+  typealias Failure = GQLError
 
-  /// Perform a GQL mutation operation.
-  ///
-  /// - Parameters:
-  ///   - mutation: The mutation operation.
-  /// - Returns: A publisher for the mutation result data and error.
-  func perform<MutationType: GraphQLMutation>(mutation: MutationType) -> AnyPublisher<MutationType.Data, GQLError>
+  let client: ApolloClientProtocol
+  let query: QueryType
+  let queue: DispatchQueue
+  let cachePolicy: CachePolicy
+  let contextIdentifier: UUID?
 
-  /// Subscribe to a GQL subscription.
-  ///
-  /// - Parameters:
-  ///   - subscription: The subscription to subscribe to.
-  /// - Returns: A publisher for the subscription result data and error.
-  func subscribe<SubscriptionType: GraphQLSubscription>(
-    subscription: SubscriptionType
-  ) -> AnyPublisher<SubscriptionType.Data, GQLError>
+  func receive<S>(subscriber: S) where S: Subscriber, Failure == S.Failure, Output == S.Input {
+    subscriber.receive(
+      subscription: OperationSubscription(
+        completion: cachePolicy == .returnCacheDataAndFetch ? .onServerData : .onSuccess,
+        operation: { handler in
+          client.fetch(
+            query: query,
+            cachePolicy: cachePolicy,
+            contextIdentifier: contextIdentifier,
+            queue: queue,
+            resultHandler: handler
+          )
+        },
+        subscriber: subscriber
+      ))
+  }
 }

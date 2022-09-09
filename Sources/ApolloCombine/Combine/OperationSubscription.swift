@@ -25,37 +25,31 @@ import Combine
 import Foundation
 
 enum Completion {
+  case none
+  case onServerData
   case onSuccess
-  case onCancel
 }
 
-class OperationSubscription<SubscriberType: Subscriber, OperationType: GraphQLOperation>: Subscription
-  where SubscriberType.Input == OperationType.Data, SubscriberType.Failure == GQLError
+final class OperationSubscription<SubscriberType: Subscriber, Input>: Subscription
+  where SubscriberType.Input == Input, SubscriberType.Failure == GQLError
 {
-  let client: ApolloClientProtocol
-  let operation: OperationType
-  let operationQueue: DispatchQueue
-
+  private var cancellable: Apollo.Cancellable?
   private let completion: Completion
   private let lock = NSRecursiveLock()
+  private let operation: (@escaping (Result<GraphQLResult<Input>, Error>) -> Void) -> Apollo.Cancellable
   private var subscriber: SubscriberType?
-  private var cancellable: Apollo.Cancellable?
 
   init(
-    subscriber: SubscriberType,
-    client: ApolloClientProtocol,
-    operation: OperationType,
-    operationQueue: DispatchQueue,
-    completion: Completion
+    completion: Completion,
+    operation: @escaping (@escaping (Result<GraphQLResult<Input>, Error>) -> Void) -> Apollo.Cancellable,
+    subscriber: SubscriberType
   ) {
-    self.subscriber = subscriber
-    self.client = client
-    self.operation = operation
-    self.operationQueue = operationQueue
     self.completion = completion
+    self.operation = operation
+    self.subscriber = subscriber
   }
 
-  final func request(_ demand: Subscribers.Demand) {
+  func request(_ demand: Subscribers.Demand) {
     guard demand > .none else {
       return
     }
@@ -66,29 +60,27 @@ class OperationSubscription<SubscriberType: Subscriber, OperationType: GraphQLOp
     }
 
     cancellable?.cancel()
-    cancellable = executeOperation()
+    cancellable = operation { [weak self] value in
+      self?.handle(result: value)
+    }
   }
 
-  final func cancel() {
+  func cancel() {
     lock.lock()
     defer {
       lock.unlock()
     }
 
-    if completion == .onCancel {
-      subscriber?.receive(completion: .finished)
-    }
-
     // Release the subscriber reference and also prevent it from further receiving values.
-    subscriber = nil
+    self.subscriber = nil
     cancellable?.cancel()
+
+    // Do not send a `finished` event on cancel, since a GQL subscription should never complete. Sending an event
+    // upon cancel can result in a fatal error of: Fatal error: Unexpected state: received completion but do not have
+    // subscription
   }
 
-  func executeOperation() -> Apollo.Cancellable {
-    EmptyCancellable()
-  }
-
-  final func handle(result: Result<GraphQLResult<SubscriberType.Input>, Error>) {
+  private func handle(result: Result<GraphQLResult<Input>, Error>) {
     lock.lock()
     defer {
       lock.unlock()
@@ -98,21 +90,28 @@ class OperationSubscription<SubscriberType: Subscriber, OperationType: GraphQLOp
       return
     }
 
+    func complete(completion: Subscribers.Completion<GQLError>) {
+      self.subscriber = nil
+      subscriber.receive(completion: completion)
+    }
+
     switch result {
-    case let .success(data):
-      if let data = data.data {
+    case let .success(resultData):
+      if let errors = resultData.errors, !errors.isEmpty {
+        complete(completion: .failure(.errors(errors)))
+      } else if let data = resultData.data {
         // Ignore demand since it's unlimited.
         _ = subscriber.receive(data)
         if completion == .onSuccess {
-          subscriber.receive(completion: .finished)
+          complete(completion: .finished)
+        } else if completion == .onServerData, resultData.source == .server {
+          complete(completion: .finished)
         }
-      } else if let errors = data.errors, !errors.isEmpty {
-        subscriber.receive(completion: .failure(.errors(errors)))
       } else {
-        subscriber.receive(completion: .failure(.missingData))
+        complete(completion: .failure(.missingData))
       }
     case let .failure(error):
-      subscriber.receive(completion: .failure(.nonGQL(error)))
+      complete(completion: .failure(.nonGQL(error)))
     }
   }
 }
