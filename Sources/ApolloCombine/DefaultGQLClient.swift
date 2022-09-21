@@ -28,7 +28,7 @@ import Foundation
 public class DefaultGQLClient: GQLClient {
   private let client: ApolloClientProtocol
   private let operationQueue = DispatchQueue(label: "gql-operation", qos: .userInteractive)
-  private let webSocketStatusLock = NSLock()
+  private let webSocketStatusLock = NSRecursiveLock()
   private var webSocketTransport: WebSocketTransport?
   private var isWebSocketConnected = false
 
