@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 import Apollo
+import ApolloAPI
 import Combine
 import Foundation
 

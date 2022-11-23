@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 import Apollo
+import ApolloAPI
 import ApolloWebSocket
 import Combine
 import Foundation
@@ -56,7 +57,7 @@ extension DefaultGQLClient {
     intercepterProvider: InterceptorProvider,
     store: ApolloStore,
     additionalHeaders: [String: String],
-    webSocketConnectingPayload: [String: JSONEncodable?]? = nil
+    webSocketConnectingPayload: JSONEncodableDictionary? = nil
   ) -> GQLClient {
     let (networkTransport, webSocketTransport) = newTransports(
       normalEndpoint: normalEndpoint,
@@ -77,7 +78,7 @@ extension DefaultGQLClient {
     intercepterProvider: InterceptorProvider,
     store: ApolloStore,
     additionalHeaders: [String: String],
-    webSocketConnectingPayload: [String: JSONEncodable?]? = nil
+    webSocketConnectingPayload: JSONEncodableDictionary? = nil
   ) -> (NetworkTransport, WebSocketTransport?) {
     let normalTransport = RequestChainNetworkTransport(
       interceptorProvider: intercepterProvider,
@@ -90,13 +91,14 @@ extension DefaultGQLClient {
       let webSocketTransport = WebSocketTransport(
         websocket: webSocket,
         store: store,
-        sendOperationIdentifiers: false,
-        reconnect: false,
-        reconnectionInterval: 0.5,
-        allowSendingDuplicates: true,
-        // Connection is made on first subscription. See below web socket section for details.
-        connectOnInit: false,
-        connectingPayload: webSocketConnectingPayload
+        config: WebSocketTransport.Configuration(
+          reconnect: false,
+          reconnectionInterval: 0.5,
+          allowSendingDuplicates: true,
+          // Connection is made on first subscription. See below web socket section for details.
+          connectOnInit: false,
+          connectingPayload: webSocketConnectingPayload
+        )
       )
 
       let splitNetworkTransport = SplitNetworkTransport(
@@ -171,7 +173,7 @@ extension DefaultGQLClient {
 // operation returned `connection_error`. When this occurs, the client can receive the error via the publisher and
 // retry connecting.
 extension DefaultGQLClient {
-  public func updateWebSocketConnectingPayload(_ payload: [String: JSONEncodable?]) {
+  public func updateWebSocketConnectingPayload(_ payload: JSONEncodableDictionary) {
     webSocketTransport?.updateConnectingPayload(payload, reconnectIfConnected: true)
   }
 

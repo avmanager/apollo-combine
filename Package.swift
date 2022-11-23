@@ -15,7 +15,7 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(url: "https://github.com/apollographql/apollo-ios", .upToNextMajor(from: "0.51.2")),
+    .package(url: "https://github.com/apollographql/apollo-ios", .upToNextMajor(from: "1.0.5")),
   ],
   targets: [
     .target(

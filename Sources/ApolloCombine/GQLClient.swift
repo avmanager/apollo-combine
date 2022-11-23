@@ -21,11 +21,20 @@
 // SOFTWARE.
 
 import Apollo
+import ApolloAPI
 import Combine
 import Foundation
 
 /// A client used to communicate with the backend via GraphQL operations.
 public protocol GQLClient {
+  /// Update the payload used for making web socket connections.
+  ///
+  /// - Note: If the web socket is already connected, invoking this function will reconnect the web socket.
+  ///
+  /// - Parameters:
+  ///   - payload: The payload to use.
+  func updateWebSocketConnectingPayload(_ payload: JSONEncodableDictionary)
+
   /// Perform a GQL query operation.
   ///
   /// - Parameters:

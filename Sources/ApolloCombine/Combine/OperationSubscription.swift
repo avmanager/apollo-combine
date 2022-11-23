@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 import Apollo
+import ApolloAPI
 import Combine
 import Foundation
 
@@ -30,7 +31,7 @@ enum Completion {
   case onSuccess
 }
 
-final class OperationSubscription<SubscriberType: Subscriber, Input>: Subscription
+final class OperationSubscription<SubscriberType: Subscriber, Input: RootSelectionSet>: Subscription
   where SubscriberType.Input == Input, SubscriberType.Failure == GQLError
 {
   private var cancellable: Apollo.Cancellable?
