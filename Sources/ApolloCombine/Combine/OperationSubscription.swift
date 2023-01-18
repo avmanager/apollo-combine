@@ -51,18 +51,26 @@ final class OperationSubscription<SubscriberType: Subscriber, Input: RootSelecti
   }
 
   func request(_ demand: Subscribers.Demand) {
-    guard demand > .none else {
-      return
-    }
-
     lock.lock()
     defer {
       lock.unlock()
     }
 
+    guard demand > .none, demand > 0 else {
+      cancellable?.cancel()
+      cancellable = nil
+      return
+    }
+
+    var demand = demand
     cancellable?.cancel()
     cancellable = operation { [weak self] value in
-      self?.handle(result: value)
+      guard let self = self, demand > 0 else {
+        return
+      }
+
+      demand -= 1
+      demand += self.handle(result: value)
     }
   }
 
@@ -76,19 +84,18 @@ final class OperationSubscription<SubscriberType: Subscriber, Input: RootSelecti
     self.subscriber = nil
     cancellable?.cancel()
 
-    // Do not send a `finished` event on cancel, since a GQL subscription should never complete. Sending an event
-    // upon cancel can result in a fatal error of: Fatal error: Unexpected state: received completion but do not have
-    // subscription
+    // Do not send a `finished` event on cancel. Sending an event upon cancel can result in a fatal error of:
+    // Fatal error: Unexpected state: received completion but do not have subscription.
   }
 
-  private func handle(result: Result<GraphQLResult<Input>, Error>) {
+  private func handle(result: Result<GraphQLResult<Input>, Error>) -> Subscribers.Demand {
     lock.lock()
     defer {
       lock.unlock()
     }
 
     guard let subscriber = subscriber else {
-      return
+      return .none
     }
 
     func complete(completion: Subscribers.Completion<GQLError>) {
@@ -100,19 +107,24 @@ final class OperationSubscription<SubscriberType: Subscriber, Input: RootSelecti
     case let .success(resultData):
       if let errors = resultData.errors, !errors.isEmpty {
         complete(completion: .failure(.errors(errors)))
+        return .none
       } else if let data = resultData.data {
         // Ignore demand since it's unlimited.
-        _ = subscriber.receive(data)
+        let furtherDemand = subscriber.receive(data)
         if completion == .onSuccess {
           complete(completion: .finished)
         } else if completion == .onServerData, resultData.source == .server {
           complete(completion: .finished)
         }
+
+        return furtherDemand
       } else {
         complete(completion: .failure(.missingData))
+        return .none
       }
     case let .failure(error):
       complete(completion: .failure(.nonGQL(error)))
+      return .none
     }
   }
 }
