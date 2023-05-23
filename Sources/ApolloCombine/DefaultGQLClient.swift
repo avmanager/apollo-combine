@@ -54,14 +54,16 @@ extension DefaultGQLClient {
   public static func newInstance(
     normalEndpoint: URL,
     webSocketEndpoint: URL? = nil,
+    webSocketProtocol: WebSocket.WSProtocol = .graphql_ws,
     intercepterProvider: InterceptorProvider,
     store: ApolloStore,
-    additionalHeaders: [String: String],
+    additionalHeaders: [String: String] = [:],
     webSocketConnectingPayload: JSONEncodableDictionary? = nil
   ) -> GQLClient {
     let (networkTransport, webSocketTransport) = newTransports(
       normalEndpoint: normalEndpoint,
       webSocketEndpoint: webSocketEndpoint,
+      webSocketProtocol: webSocketProtocol,
       intercepterProvider: intercepterProvider,
       store: store,
       additionalHeaders: additionalHeaders,
@@ -75,9 +77,10 @@ extension DefaultGQLClient {
   public static func newTransports(
     normalEndpoint: URL,
     webSocketEndpoint: URL? = nil,
+    webSocketProtocol: WebSocket.WSProtocol = .graphql_ws,
     intercepterProvider: InterceptorProvider,
     store: ApolloStore,
-    additionalHeaders: [String: String],
+    additionalHeaders: [String: String] = [:],
     webSocketConnectingPayload: JSONEncodableDictionary? = nil
   ) -> (NetworkTransport, WebSocketTransport?) {
     let normalTransport = RequestChainNetworkTransport(
@@ -87,7 +90,7 @@ extension DefaultGQLClient {
     )
 
     if let webSocketEndpoint = webSocketEndpoint {
-      let webSocket = WebSocket(request: URLRequest(url: webSocketEndpoint), protocol: .graphql_ws)
+      let webSocket = WebSocket(request: URLRequest(url: webSocketEndpoint), protocol: webSocketProtocol)
       let webSocketTransport = WebSocketTransport(
         websocket: webSocket,
         store: store,
